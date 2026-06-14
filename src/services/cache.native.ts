@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Crypto from "expo-crypto";
 import { Directory, File, Paths } from "expo-file-system";
-import type { PlayerManifest } from "@dooh/shared";
+import type { PlayerManifest } from "../lib/shared";
 import type { CachedManifest } from "../types";
 
 const root = new Directory(Paths.document, "dooh-content");

@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { PlayerManifest } from "@dooh/shared";
+import type { PlayerManifest } from "../lib/shared";
 import type { CachedManifest } from "../types";
 
 const MANIFEST_KEY = "dooh:web-manifest";

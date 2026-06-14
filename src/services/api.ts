@@ -4,7 +4,7 @@ import {
   pairingSessionStatusResponseSchema,
   playerManifestSchema,
   type HeartbeatRequest,
-} from "@dooh/shared";
+} from "../lib/shared";
 import type { PlayerSettings, QueuedError } from "../types";
 
 async function jsonRequest(url: string, init?: RequestInit) {

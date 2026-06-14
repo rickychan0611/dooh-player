@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Constants from "expo-constants";
 import * as Network from "expo-network";
-import { formatClaimCode, type PendingPairingSession } from "@dooh/shared";
+import { formatClaimCode, type PendingPairingSession } from "../lib/shared";
 import { getApiBaseUrl } from "../config";
 import { useResponsiveScale } from "../hooks/useResponsiveScale";
 import {

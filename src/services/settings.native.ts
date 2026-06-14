@@ -6,7 +6,7 @@ import type { PlayerSettings } from "../types";
 import {
   pendingPairingSessionSchema,
   type PendingPairingSession,
-} from "@dooh/shared";
+} from "../lib/shared";
 
 const SETTINGS_KEY = "dooh:settings";
 const TOKEN_KEY = "dooh.device-token";

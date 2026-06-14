@@ -12,7 +12,7 @@ import Svg, { Circle } from "react-native-svg";
 import {
   bulletinCategoryColor,
   formatBulletinCategoryLabel,
-} from "@dooh/shared";
+} from "../lib/shared";
 import { useResponsiveScale } from "../hooks/useResponsiveScale";
 import {
   clampSlotIndices,

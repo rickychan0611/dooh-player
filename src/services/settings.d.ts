@@ -1,5 +1,5 @@
 import type { PlayerSettings } from "../types";
-import type { PendingPairingSession } from "@dooh/shared";
+import type { PendingPairingSession } from "../lib/shared";
 
 export function getDeviceId(): Promise<string>;
 export function loadSettings(): Promise<PlayerSettings | null>;

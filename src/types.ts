@@ -1,4 +1,4 @@
-import type { PlayerManifest } from "@dooh/shared";
+import type { PlayerManifest } from "./lib/shared";
 
 export type PlayerSettings = {
   apiBaseUrl: string;
