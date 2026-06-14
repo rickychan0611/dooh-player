@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BackHandler, Platform, StyleSheet, Text, View } from "react-native";
 import Constants from "expo-constants";
 import { activateKeepAwakeAsync } from "expo-keep-awake";
@@ -16,6 +16,15 @@ import { PlayerScreen } from "./src/screens/PlayerScreen";
 import { SetupScreen } from "./src/screens/SetupScreen";
 import type { CachedManifest, PlayerSettings } from "./src/types";
 
+async function readNetworkConnected() {
+  const network = await Network.getNetworkStateAsync();
+  return Boolean(network.isConnected && network.isInternetReachable !== false);
+}
+
+function readNetworkConnectedFromState(state: Network.NetworkState) {
+  return Boolean(state.isConnected && state.isInternetReachable !== false);
+}
+
 export default function App() {
   const scale = useResponsiveScale();
   const [settings, setSettings] = useState<PlayerSettings | null>(null);
@@ -27,6 +36,28 @@ export default function App() {
   const [lastError, setLastError] = useState<string | null>(null);
   const [currentItemId, setCurrentItemId] = useState<string | null>(null);
   const [freeStorageMb, setFreeStorageMb] = useState(0);
+
+  const settingsRef = useRef(settings);
+  const manifestRef = useRef(manifest);
+  const currentItemIdRef = useRef(currentItemId);
+  const lastSyncAtRef = useRef(lastSyncAt);
+  const lastErrorRef = useRef(lastError);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+  useEffect(() => {
+    manifestRef.current = manifest;
+  }, [manifest]);
+  useEffect(() => {
+    currentItemIdRef.current = currentItemId;
+  }, [currentItemId]);
+  useEffect(() => {
+    lastSyncAtRef.current = lastSyncAt;
+  }, [lastSyncAt]);
+  useEffect(() => {
+    lastErrorRef.current = lastError;
+  }, [lastError]);
 
   useEffect(() => {
     activateKeepAwakeAsync("dooh-player");
@@ -68,25 +99,53 @@ export default function App() {
   }, [debug, manifest, settings]);
 
   const sync = useCallback(async () => {
-    if (!settings) return;
+    const currentSettings = settingsRef.current;
+    if (!currentSettings) return;
     try {
-      const network = await Network.getNetworkStateAsync();
-      const connected = Boolean(network.isConnected && network.isInternetReachable !== false);
+      const connected = await readNetworkConnected();
       setOnline(connected);
       if (!connected) return;
-      const remote = await fetchManifest(settings);
+      const remote = await fetchManifest(currentSettings);
       const promoted = await stageAndPromote(remote);
       setManifest(promoted);
       const now = new Date().toISOString();
       setLastSyncAt(now);
       setLastError(null);
-      await flushErrors(settings);
+      await flushErrors(currentSettings);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Synchronization failed.";
       setLastError(message);
       await queueError({ errorType: "sync_error", errorMessage: message });
     }
-  }, [settings]);
+  }, []);
+
+  const heartbeat = useCallback(async () => {
+    const currentSettings = settingsRef.current;
+    const currentManifest = manifestRef.current;
+    if (!currentSettings || !currentManifest || !lastSyncAtRef.current) return;
+
+    try {
+      const connected = await readNetworkConnected();
+      setOnline(connected);
+      if (!connected) return;
+
+      const availableStorageMb = await getFreeStorageMb();
+      setFreeStorageMb(availableStorageMb);
+      await sendHeartbeat(currentSettings, {
+        deviceId: currentSettings.deviceId,
+        appVersion: Constants.expoConfig?.version ?? "1.0.0",
+        mode: currentManifest.mode,
+        layout: currentManifest.layout,
+        contentVersion: currentManifest.contentVersion,
+        currentItemId: currentItemIdRef.current,
+        freeStorageMb: availableStorageMb,
+        lastSyncAt: lastSyncAtRef.current,
+        error: lastErrorRef.current,
+      });
+    } catch {
+      // Retry on the next interval or when connectivity returns.
+    }
+  }, []);
 
   useEffect(() => {
     if (!settings) return;
@@ -97,35 +156,37 @@ export default function App() {
 
   useEffect(() => {
     if (!settings || !manifest) return;
-    async function heartbeat() {
-      try {
-        const network = await Network.getNetworkStateAsync();
-        const connected = Boolean(network.isConnected && network.isInternetReachable !== false);
-        setOnline(connected);
-        if (!connected) return;
-        const availableStorageMb = await getFreeStorageMb();
-        setFreeStorageMb(availableStorageMb);
-        await sendHeartbeat(settings!, {
-          deviceId: settings!.deviceId,
-          appVersion: Constants.expoConfig?.version ?? "1.0.0",
-          mode: manifest!.mode,
-          layout: manifest!.layout,
-          contentVersion: manifest!.contentVersion,
-          currentItemId,
-          freeStorageMb: availableStorageMb,
-          lastSyncAt,
-          error: lastError,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Heartbeat failed.";
-        setLastError(message);
-        await queueError({ errorType: "heartbeat_error", errorMessage: message });
-      }
-    }
     heartbeat();
     const timer = setInterval(heartbeat, 120_000);
     return () => clearInterval(timer);
-  }, [currentItemId, lastError, lastSyncAt, manifest, settings]);
+  }, [settings, manifest, heartbeat]);
+
+  useEffect(() => {
+    if (!settings) return;
+
+    let wasConnected = false;
+
+    async function catchUpAfterReconnect() {
+      await sync();
+      await heartbeat();
+    }
+
+    void readNetworkConnected().then((connected) => {
+      wasConnected = connected;
+      setOnline(connected);
+    });
+
+    const subscription = Network.addNetworkStateListener((state) => {
+      const connected = readNetworkConnectedFromState(state);
+      setOnline(connected);
+      if (connected && !wasConnected) {
+        void catchUpAfterReconnect();
+      }
+      wasConnected = connected;
+    });
+
+    return () => subscription.remove();
+  }, [settings, sync, heartbeat]);
 
   async function reset() {
     await clearSettings();

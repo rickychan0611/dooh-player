@@ -11,11 +11,15 @@
     },
     "android": {
       "package": "com.doohplatform.player",
-      "permissions": ["android.permission.INTERNET"],
+      "permissions": [
+        "android.permission.INTERNET"
+      ],
       "intentFilters": [
         {
           "action": "MAIN",
-          "category": ["LEANBACK_LAUNCHER"],
+          "category": [
+            "LEANBACK_LAUNCHER"
+          ],
           "data": []
         }
       ],
@@ -33,6 +37,11 @@
     "plugins": [
       "expo-video",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e86361cd-fd50-4cde-bf8c-92ba799ad676"
+      }
+    }
   }
 }

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@dooh/shared": "file:../../packages/shared",
+    "@dooh/shared": "file:./packages/shared",
     "@expo/metro-runtime": "~56.0.15",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~56.0.11",
@@ -32,6 +32,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "build:web": "expo export --platform web",
+    "build:apk": "eas build --platform android --profile preview",
+    "build:apk:local": "eas build --platform android --profile preview --local",
+    "eas-build-post-install": "npm run build --prefix packages/shared",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
