@@ -5,6 +5,14 @@ import { sendPlayerError } from "./api";
 const KEY = "dooh:error-queue";
 const LIMIT = 50;
 
+export function userFacingConnectionError(_error: unknown): string {
+  return "Not connected.";
+}
+
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
 export async function queueError(error: Omit<QueuedError, "occurredAt">) {
   const queue = await readQueue();
   queue.push({ ...error, occurredAt: new Date().toISOString() });

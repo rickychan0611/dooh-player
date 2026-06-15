@@ -7,7 +7,7 @@ import * as Network from "expo-network";
 import { StatusBar } from "expo-status-bar";
 import { fetchManifest, sendHeartbeat } from "./src/services/api";
 import { loadCachedManifest, stageAndPromote } from "./src/services/cache";
-import { flushErrors, queueError } from "./src/services/errors";
+import { flushErrors, errorMessage, queueError, userFacingConnectionError } from "./src/services/errors";
 import { clearSettings, loadSettings } from "./src/services/settings";
 import { getFreeStorageMb } from "./src/services/storage";
 import { DebugScreen } from "./src/screens/DebugScreen";
@@ -113,9 +113,8 @@ export default function App() {
       setLastError(null);
       await flushErrors(currentSettings);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Synchronization failed.";
-      setLastError(message);
-      await queueError({ errorType: "sync_error", errorMessage: message });
+      setLastError(userFacingConnectionError(error));
+      await queueError({ errorType: "sync_error", errorMessage: errorMessage(error) });
     }
   }, []);
 

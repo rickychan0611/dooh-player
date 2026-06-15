@@ -240,6 +240,7 @@ function BulletinCard({
 }) {
   const progress = useRef(new Animated.Value(0)).current;
   const isFirstCycle = useRef(true);
+  const [webStrokeDashoffset, setWebStrokeDashoffset] = useState(0);
   const bgColor = bulletinCategoryColor(message.category);
 
   useEffect(() => {
@@ -273,6 +274,28 @@ function BulletinCard({
     inputRange: [0, 1],
     outputRange: [0, circumference],
   });
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const listenerId = progress.addListener(({ value }) => {
+      setWebStrokeDashoffset(value * circumference);
+    });
+    return () => progress.removeListener(listenerId);
+  }, [circumference, progress]);
+
+  const ringCircleProps = {
+    cx: svgSize / 2,
+    cy: svgSize / 2,
+    r: ringRadius,
+    fill: "none" as const,
+    stroke: "#000000",
+    strokeWidth: ringStroke,
+    strokeLinecap: "round" as const,
+    strokeDasharray: circumference,
+    rotation: -90,
+    originX: svgSize / 2,
+    originY: svgSize / 2,
+  };
 
   return (
     <View
@@ -367,20 +390,17 @@ function BulletinCard({
           height={svgSize}
           style={[styles.ring, { top: -ringOverflow, left: -ringOverflow }]}
         >
-          <AnimatedCircle
-            cx={svgSize / 2}
-            cy={svgSize / 2}
-            r={ringRadius}
-            fill="none"
-            stroke="#000000"
-            strokeWidth={ringStroke}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            rotation={-90}
-            originX={svgSize / 2}
-            originY={svgSize / 2}
-          />
+          {Platform.OS === "web" ? (
+            <Circle
+              {...ringCircleProps}
+              strokeDashoffset={webStrokeDashoffset}
+            />
+          ) : (
+            <AnimatedCircle
+              {...ringCircleProps}
+              strokeDashoffset={strokeDashoffset}
+            />
+          )}
         </Svg>
         <Text style={[styles.postNumberText, { fontSize: 13 * scale }]}>
           {message.postNumber ? `#${message.postNumber}` : "#"}

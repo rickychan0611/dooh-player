@@ -17,6 +17,7 @@ import {
   savePendingPairing,
   saveSettings,
 } from "../services/settings";
+import { userFacingConnectionError } from "../services/errors";
 import type { PlayerSettings } from "../types";
 
 export function SetupScreen({
@@ -66,7 +67,7 @@ export function SetupScreen({
       setPairing(created);
       setStatus("Enter this code in the admin dashboard.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Pairing failed.");
+      setStatus(userFacingConnectionError(error));
     } finally {
       busy.current = false;
     }
@@ -114,7 +115,7 @@ export function SetupScreen({
       }
       setStatus("Waiting for an administrator to connect this player...");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Pairing failed.");
+      setStatus(userFacingConnectionError(error));
     } finally {
       busy.current = false;
     }
