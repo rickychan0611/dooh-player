@@ -5,12 +5,25 @@ import { sendPlayerError } from "./api";
 const KEY = "dooh:error-queue";
 const LIMIT = 50;
 
-export function userFacingConnectionError(_error: unknown): string {
-  return "Not connected.";
-}
-
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
+}
+
+export function isPlayerAuthError(error: unknown): boolean {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    message.includes("401") ||
+    message.includes("invalid device token") ||
+    message.includes("unauthorized")
+  );
+}
+
+export function userFacingConnectionError(error: unknown): string {
+  if (isPlayerAuthError(error)) {
+    return "Player disconnected. Reset pairing and enter a new dashboard code.";
+  }
+  const message = errorMessage(error);
+  return message || "Not connected.";
 }
 
 export async function queueError(error: Omit<QueuedError, "occurredAt">) {

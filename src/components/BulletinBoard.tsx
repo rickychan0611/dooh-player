@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Easing,
   Platform,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
-import Svg, { Circle } from "react-native-svg";
 import {
   bulletinCategoryColor,
   formatBulletinCategoryLabel,
 } from "../lib/shared";
 import { useResponsiveScale } from "../hooks/useResponsiveScale";
+import { ProgressRing } from "./ProgressRing";
 import {
   clampSlotIndices,
   initialSlotIndices,
@@ -23,18 +21,8 @@ import type { CachedManifest } from "../types";
 
 type BulletinMessage = CachedManifest["bulletin"]["messages"][number];
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-const ROTATE_MS = 60_000;
-const STAGGER_MS = 15_000;
-const MIN_FLIP_DELAY_MS = 10_000;
-const MAX_FLIP_DELAY_MS = 20_000;
 const BOARD_COLUMNS = 5;
 const BOARD_ROWS = 3;
-
-function randomFlipDelayMs() {
-  return MIN_FLIP_DELAY_MS + Math.random() * (MAX_FLIP_DELAY_MS - MIN_FLIP_DELAY_MS);
-}
 
 function dropShadow({
   offsetY,
@@ -238,64 +226,15 @@ function BulletinCard({
   cellSize: { width: number; height: number } | null;
   onComplete: (slotPosition: number) => void;
 }) {
-  const progress = useRef(new Animated.Value(0)).current;
-  const isFirstCycle = useRef(true);
-  const [webStrokeDashoffset, setWebStrokeDashoffset] = useState(0);
   const bgColor = bulletinCategoryColor(message.category);
-
-  useEffect(() => {
-    progress.setValue(0);
-    const delayMs = isFirstCycle.current
-      ? slotPosition * STAGGER_MS
-      : randomFlipDelayMs();
-    isFirstCycle.current = false;
-    const animation = Animated.sequence([
-      Animated.delay(delayMs),
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: ROTATE_MS,
-        easing: Easing.linear,
-        useNativeDriver: false,
-      }),
-    ]);
-    animation.start(({ finished }) => {
-      if (finished) onComplete(slotPosition);
-    });
-    return () => animation.stop();
-  }, [message.id, onComplete, slotPosition, progress]);
+  const handleComplete = useCallback(() => {
+    onComplete(slotPosition);
+  }, [onComplete, slotPosition]);
 
   const badgeSize = 32 * scale;
   const ringStroke = 2 * scale;
   const ringOverflow = 1;
   const svgSize = badgeSize + ringOverflow * 2;
-  const ringRadius = (svgSize - ringStroke) / 2;
-  const circumference = 2 * Math.PI * ringRadius;
-  const strokeDashoffset = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, circumference],
-  });
-
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-    const listenerId = progress.addListener(({ value }) => {
-      setWebStrokeDashoffset(value * circumference);
-    });
-    return () => progress.removeListener(listenerId);
-  }, [circumference, progress]);
-
-  const ringCircleProps = {
-    cx: svgSize / 2,
-    cy: svgSize / 2,
-    r: ringRadius,
-    fill: "none" as const,
-    stroke: "#000000",
-    strokeWidth: ringStroke,
-    strokeLinecap: "round" as const,
-    strokeDasharray: circumference,
-    rotation: -90,
-    originX: svgSize / 2,
-    originY: svgSize / 2,
-  };
 
   return (
     <View
@@ -384,24 +323,14 @@ function BulletinCard({
           },
         ]}
       >
-        <Svg
-          pointerEvents="none"
-          width={svgSize}
-          height={svgSize}
-          style={[styles.ring, { top: -ringOverflow, left: -ringOverflow }]}
-        >
-          {Platform.OS === "web" ? (
-            <Circle
-              {...ringCircleProps}
-              strokeDashoffset={webStrokeDashoffset}
-            />
-          ) : (
-            <AnimatedCircle
-              {...ringCircleProps}
-              strokeDashoffset={strokeDashoffset}
-            />
-          )}
-        </Svg>
+        <ProgressRing
+          svgSize={svgSize}
+          ringStroke={ringStroke}
+          ringOverflow={ringOverflow}
+          slotPosition={slotPosition}
+          messageId={message.id}
+          onComplete={handleComplete}
+        />
         <Text style={[styles.postNumberText, { fontSize: 13 * scale }]}>
           {message.postNumber ? `#${message.postNumber}` : "#"}
         </Text>
@@ -451,9 +380,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     alignItems: "center",
     justifyContent: "center",
-  },
-  ring: {
-    position: "absolute",
   },
   postNumberText: {
     color: "#000000",

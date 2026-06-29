@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BackHandler, Platform, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import Constants from "expo-constants";
 import { activateKeepAwakeAsync } from "expo-keep-awake";
 import { NavigationBar as SystemNavigationBar } from "expo-navigation-bar";
@@ -7,7 +7,7 @@ import * as Network from "expo-network";
 import { StatusBar } from "expo-status-bar";
 import { fetchManifest, sendHeartbeat } from "./src/services/api";
 import { loadCachedManifest, stageAndPromote } from "./src/services/cache";
-import { flushErrors, errorMessage, queueError, userFacingConnectionError } from "./src/services/errors";
+import { flushErrors, errorMessage, isPlayerAuthError, queueError, userFacingConnectionError } from "./src/services/errors";
 import { clearSettings, loadSettings } from "./src/services/settings";
 import { getFreeStorageMb } from "./src/services/storage";
 import { DebugScreen } from "./src/screens/DebugScreen";
@@ -113,6 +113,13 @@ export default function App() {
       setLastError(null);
       await flushErrors(currentSettings);
     } catch (error) {
+      if (isPlayerAuthError(error)) {
+        await clearSettings();
+        setSettings(null);
+        setManifest(null);
+        setLastError(null);
+        return;
+      }
       setLastError(userFacingConnectionError(error));
       await queueError({ errorType: "sync_error", errorMessage: errorMessage(error) });
     }
@@ -204,7 +211,28 @@ export default function App() {
     return <><DebugScreen settings={settings} manifest={manifest} online={online} lastSyncAt={lastSyncAt} lastError={lastError} freeStorageMb={freeStorageMb} onSync={sync} onReset={reset} onClose={() => setDebug(false)} /><StatusBar hidden /></>;
   }
   if (!manifest) {
-    return <View style={[styles.loading, { padding: 30 * scale }]}><Text style={[styles.loadingText, { fontSize: 28 * scale }]}>Waiting for the first complete content download...</Text><Text style={[styles.error, { fontSize: 17 * scale, marginTop: 15 * scale }]}>{lastError}</Text><StatusBar hidden /></View>;
+    return (
+      <View style={[styles.loading, { padding: 30 * scale }]}>
+        <Text style={[styles.loadingText, { fontSize: 28 * scale }]}>
+          {Platform.OS === "web"
+            ? "Downloading screen content..."
+            : "Waiting for the first complete content download..."}
+        </Text>
+        {lastError ? (
+          <Text style={[styles.error, { fontSize: 17 * scale, marginTop: 15 * scale }]}>
+            {lastError}
+          </Text>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          onPress={reset}
+          style={[styles.resetButton, { marginTop: 24 * scale, padding: 14 * scale }]}
+        >
+          <Text style={[styles.resetButtonText, { fontSize: 16 * scale }]}>Reset pairing</Text>
+        </Pressable>
+        <StatusBar hidden />
+      </View>
+    );
   }
   return <><PlayerScreen manifest={manifest} onItemChange={setCurrentItemId} onOpenDebug={() => setDebug(true)} /><StatusBar hidden /></>;
 }
@@ -212,5 +240,12 @@ export default function App() {
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#08110f" },
   loadingText: { color: "#f4f7f3", textAlign: "center" },
-  error: { color: "#ff968f", textAlign: "center" },
+  error: { color: "#ff968f", textAlign: "center", maxWidth: 560 },
+  resetButton: {
+    borderWidth: 1,
+    borderColor: "#2b3c37",
+    borderRadius: 10,
+    backgroundColor: "#101c19",
+  },
+  resetButtonText: { color: "#b8f36b", fontWeight: "700" },
 });

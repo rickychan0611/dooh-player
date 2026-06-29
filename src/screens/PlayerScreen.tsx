@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AdPlayer } from "../components/AdPlayer";
 import { BulletinBoard } from "../components/BulletinBoard";
 import {
@@ -35,6 +35,17 @@ export function PlayerScreen({
     return () => clearTimeout(timer);
   }, [block, manifest]);
 
+  if (manifest.serviceStatus === "suspended") {
+    return (
+      <View style={styles.suspended}>
+        <Text style={styles.suspendedTitle}>Screen service paused</Text>
+        <Text style={styles.suspendedBody}>
+          The account owner can reactivate this screen from the billing page.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <Pressable
       accessibilityLabel="DOOH player"
@@ -54,4 +65,25 @@ export function PlayerScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#000" },
+  suspended: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 48,
+    backgroundColor: "#08110f",
+  },
+  suspendedTitle: {
+    color: "#f4f7f3",
+    fontSize: 44,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  suspendedBody: {
+    color: "#9aaca6",
+    fontSize: 20,
+    lineHeight: 30,
+    marginTop: 16,
+    maxWidth: 700,
+    textAlign: "center",
+  },
 });
