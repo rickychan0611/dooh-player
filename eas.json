@@ -5,6 +5,9 @@
   "build": {
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://dooh-web-pi.vercel.app"
+      },
       "android": {
         "buildType": "apk"
       }
