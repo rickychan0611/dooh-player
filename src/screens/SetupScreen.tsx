@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import * as Network from "expo-network";
 import { formatClaimCode, type PendingPairingSession } from "../lib/shared";
 import { getApiBaseUrl } from "../config";
-import { useResponsiveScale } from "../hooks/useResponsiveScale";
+import { useResponsiveLayout } from "../hooks/useResponsiveScale";
 import {
   createPairingSession,
   fetchPairingSessionStatus,
@@ -18,14 +18,21 @@ import {
   saveSettings,
 } from "../services/settings";
 import { userFacingConnectionError } from "../services/errors";
+import { RotationControls } from "../components/RotationControls";
+import { useWebTvRemote, NO_TV_FOCUS } from "../hooks/useWebTvRemote";
 import type { PlayerSettings } from "../types";
 
 export function SetupScreen({
   onComplete,
+  onRotateClockwise,
+  onRotateCounterClockwise,
 }: {
   onComplete: (settings: PlayerSettings) => void;
+  onRotateClockwise: () => void;
+  onRotateCounterClockwise: () => void;
 }) {
-  const scale = useResponsiveScale();
+  const { scale, inset, contentWidth } = useResponsiveLayout();
+  const [focusIndex, setFocusIndex] = useState(NO_TV_FOCUS);
   const [pairing, setPairing] = useState<PendingPairingSession | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [online, setOnline] = useState(true);
@@ -147,13 +154,30 @@ export function SetupScreen({
   const minutes = Math.floor(seconds / 60);
   const secondPart = String(seconds % 60).padStart(2, "0");
 
+  useWebTvRemote({
+    itemCount: 2,
+    focusIndex,
+    setFocusIndex,
+    onSelect: (index) => {
+      if (index === 0) onRotateCounterClockwise();
+      else onRotateClockwise();
+    },
+  });
+
   return (
-    <View style={[styles.screen, { padding: 40 * scale }]}>
+    <View style={[styles.screen, { padding: inset }]}>
+      <RotationControls
+        webFocusIndex={focusIndex}
+        focusStartIndex={0}
+        onRotateClockwise={onRotateClockwise}
+        onRotateCounterClockwise={onRotateCounterClockwise}
+      />
       <View
         style={[
           styles.card,
           {
-            width: 720 * scale,
+            width: contentWidth,
+            maxWidth: contentWidth,
             padding: 44 * scale,
             borderRadius: 20 * scale,
             gap: 18 * scale,
@@ -196,11 +220,19 @@ export function SetupScreen({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#08110f",
+    backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-  card: { maxWidth: "95%", backgroundColor: "#101c19", alignItems: "center" },
+  card: {
+    backgroundColor: "#111",
+    alignItems: "center",
+    alignSelf: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#333",
+  },
   kicker: { color: "#b8f36b", fontWeight: "800" },
   title: { color: "#f4f7f3", fontWeight: "900", textAlign: "center" },
   instructions: { color: "#aebdb8", textAlign: "center" },

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { BackHandler, Platform, StyleSheet, Text, View } from "react-native";
 import Constants from "expo-constants";
 import { activateKeepAwakeAsync } from "expo-keep-awake";
 import { NavigationBar as SystemNavigationBar } from "expo-navigation-bar";
@@ -9,9 +9,20 @@ import { fetchManifest, sendHeartbeat } from "./src/services/api";
 import { loadCachedManifest, stageAndPromote } from "./src/services/cache";
 import { flushErrors, errorMessage, isPlayerAuthError, queueError, userFacingConnectionError } from "./src/services/errors";
 import { clearSettings, loadSettings } from "./src/services/settings";
+import {
+  loadScreenRotation,
+  rotateClockwise,
+  rotateCounterClockwise,
+  saveScreenRotation,
+  type ScreenRotation,
+} from "./src/services/screen-rotation";
 import { getFreeStorageMb } from "./src/services/storage";
 import { DebugScreen } from "./src/screens/DebugScreen";
-import { useResponsiveScale } from "./src/hooks/useResponsiveScale";
+import { RotatedScreen } from "./src/components/RotatedScreen";
+import { MenuTapLayer } from "./src/components/MenuTapLayer";
+import { TvButton } from "./src/components/TvButton";
+import { useResponsiveLayout } from "./src/hooks/useResponsiveScale";
+import { useWebTvRemote } from "./src/hooks/useWebTvRemote";
 import { PlayerScreen } from "./src/screens/PlayerScreen";
 import { SetupScreen } from "./src/screens/SetupScreen";
 import type { CachedManifest, PlayerSettings } from "./src/types";
@@ -25,8 +36,48 @@ function readNetworkConnectedFromState(state: Network.NetworkState) {
   return Boolean(state.isConnected && state.isInternetReachable !== false);
 }
 
+function ResetPairingButton({
+  scale,
+  onPress,
+}: {
+  scale: number;
+  onPress: () => void;
+}) {
+  const [focusIndex, setFocusIndex] = useState(0);
+
+  useWebTvRemote({
+    itemCount: 1,
+    focusIndex,
+    setFocusIndex,
+    onSelect: () => onPress(),
+  });
+
+  return (
+    <TvButton
+      label="Reset pairing"
+      scale={scale}
+      hasTVPreferredFocus
+      webFocused
+      onPress={onPress}
+      style={{ marginTop: 24 * scale }}
+    />
+  );
+}
+
+function LoadingView({
+  children,
+}: {
+  children: (layout: ReturnType<typeof useResponsiveLayout>) => ReactNode;
+}) {
+  const layout = useResponsiveLayout();
+  return (
+    <View style={[styles.loading, { padding: layout.inset }]}>
+      {children(layout)}
+    </View>
+  );
+}
+
 export default function App() {
-  const scale = useResponsiveScale();
   const [settings, setSettings] = useState<PlayerSettings | null>(null);
   const [manifest, setManifest] = useState<CachedManifest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +87,7 @@ export default function App() {
   const [lastError, setLastError] = useState<string | null>(null);
   const [currentItemId, setCurrentItemId] = useState<string | null>(null);
   const [freeStorageMb, setFreeStorageMb] = useState(0);
+  const [screenRotation, setScreenRotation] = useState<ScreenRotation>(0);
 
   const settingsRef = useRef(settings);
   const manifestRef = useRef(manifest);
@@ -64,9 +116,11 @@ export default function App() {
     if (Platform.OS === "android") {
       SystemNavigationBar.setHidden(true);
     }
-    Promise.all([loadSettings(), loadCachedManifest()]).then(([saved, cached]) => {
+    Promise.all([loadSettings(), loadCachedManifest(), loadScreenRotation()]).then(
+      ([saved, cached, rotation]) => {
       setSettings(saved);
       setManifest(cached);
+      setScreenRotation(rotation);
       setLoading(false);
     });
   }, []);
@@ -76,7 +130,9 @@ export default function App() {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event.key === "Enter" && settings && manifest && !debug) {
           event.preventDefault();
+          event.stopImmediatePropagation();
           setDebug(true);
+          return;
         }
         if ((event.key === "Escape" || event.key === "Backspace") && debug) {
           event.preventDefault();
@@ -201,51 +257,117 @@ export default function App() {
     setDebug(false);
   }
 
-  if (loading) {
-    return <View style={[styles.loading, { padding: 30 * scale }]}><Text style={[styles.loadingText, { fontSize: 28 * scale }]}>Starting player...</Text><StatusBar hidden /></View>;
+  async function updateRotation(next: ScreenRotation) {
+    setScreenRotation(next);
+    await saveScreenRotation(next);
   }
-  if (!settings) {
-    return <><SetupScreen onComplete={setSettings} /><StatusBar hidden /></>;
-  }
-  if (debug) {
-    return <><DebugScreen settings={settings} manifest={manifest} online={online} lastSyncAt={lastSyncAt} lastError={lastError} freeStorageMb={freeStorageMb} onSync={sync} onReset={reset} onClose={() => setDebug(false)} /><StatusBar hidden /></>;
-  }
-  if (!manifest) {
+
+  const showMenuTap = Boolean(settings && manifest && !debug && !loading);
+
+  function renderContent() {
+    if (loading) {
+      return (
+        <LoadingView>
+          {(layout) => (
+            <Text style={[styles.loadingText, { fontSize: 28 * layout.scale }]}>
+              Starting player...
+            </Text>
+          )}
+        </LoadingView>
+      );
+    }
+    if (!settings) {
+      return (
+        <SetupScreen
+          onComplete={setSettings}
+          onRotateClockwise={() => void updateRotation(rotateClockwise(screenRotation))}
+          onRotateCounterClockwise={() =>
+            void updateRotation(rotateCounterClockwise(screenRotation))
+          }
+        />
+      );
+    }
+    if (debug) {
+      return (
+        <DebugScreen
+          settings={settings}
+          manifest={manifest}
+          online={online}
+          lastSyncAt={lastSyncAt}
+          lastError={lastError}
+          freeStorageMb={freeStorageMb}
+          rotation={screenRotation}
+          onSync={sync}
+          onReset={reset}
+          onClose={() => setDebug(false)}
+          onRotateClockwise={() => void updateRotation(rotateClockwise(screenRotation))}
+          onRotateCounterClockwise={() =>
+            void updateRotation(rotateCounterClockwise(screenRotation))
+          }
+        />
+      );
+    }
+    if (!manifest) {
+      return (
+        <LoadingView>
+          {(layout) => (
+            <>
+              <Text
+                style={[
+                  styles.loadingText,
+                  { fontSize: 28 * layout.scale, maxWidth: layout.contentWidth },
+                ]}
+              >
+                {Platform.OS === "web"
+                  ? "Downloading screen content..."
+                  : "Waiting for the first complete content download..."}
+              </Text>
+              {lastError ? (
+                <Text
+                  style={[
+                    styles.error,
+                    {
+                      fontSize: 17 * layout.scale,
+                      marginTop: 15 * layout.scale,
+                      maxWidth: layout.contentWidth,
+                    },
+                  ]}
+                >
+                  {lastError}
+                </Text>
+              ) : null}
+              <ResetPairingButton scale={layout.scale} onPress={reset} />
+            </>
+          )}
+        </LoadingView>
+      );
+    }
     return (
-      <View style={[styles.loading, { padding: 30 * scale }]}>
-        <Text style={[styles.loadingText, { fontSize: 28 * scale }]}>
-          {Platform.OS === "web"
-            ? "Downloading screen content..."
-            : "Waiting for the first complete content download..."}
-        </Text>
-        {lastError ? (
-          <Text style={[styles.error, { fontSize: 17 * scale, marginTop: 15 * scale }]}>
-            {lastError}
-          </Text>
-        ) : null}
-        <Pressable
-          accessibilityRole="button"
-          onPress={reset}
-          style={[styles.resetButton, { marginTop: 24 * scale, padding: 14 * scale }]}
-        >
-          <Text style={[styles.resetButtonText, { fontSize: 16 * scale }]}>Reset pairing</Text>
-        </Pressable>
-        <StatusBar hidden />
-      </View>
+      <PlayerScreen manifest={manifest} onItemChange={setCurrentItemId} />
     );
   }
-  return <><PlayerScreen manifest={manifest} onItemChange={setCurrentItemId} onOpenDebug={() => setDebug(true)} /><StatusBar hidden /></>;
+
+  return (
+    <View style={styles.shell}>
+      <RotatedScreen rotation={screenRotation}>{renderContent()}</RotatedScreen>
+      {showMenuTap ? <MenuTapLayer onPress={() => setDebug(true)} /> : null}
+      <StatusBar hidden />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#08110f" },
+  shell: {
+    flex: 1,
+    backgroundColor: "#000",
+  },
+  loading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000",
+    overflow: "hidden",
+  },
   loadingText: { color: "#f4f7f3", textAlign: "center" },
   error: { color: "#ff968f", textAlign: "center", maxWidth: 560 },
-  resetButton: {
-    borderWidth: 1,
-    borderColor: "#2b3c37",
-    borderRadius: 10,
-    backgroundColor: "#101c19",
-  },
-  resetButtonText: { color: "#b8f36b", fontWeight: "700" },
 });

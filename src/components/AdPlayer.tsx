@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, StyleSheet, Text, View } from "react-native";
 import { useEventListener } from "expo";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useResponsiveScale } from "../hooks/useResponsiveScale";
@@ -15,7 +15,7 @@ function VideoAd({ ad, onComplete }: { ad: CachedAd; onComplete: () => void }) {
     const safety = setTimeout(onComplete, Math.max(ad.duration, 10) * 1000);
     return () => clearTimeout(safety);
   }, [ad.duration, onComplete]);
-  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} />;
+  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} surfaceType={Platform.OS === "android" ? "textureView" : undefined} />;
 }
 
 export function AdPlayer({
@@ -57,6 +57,6 @@ export function AdPlayer({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   media: { width: "100%", height: "100%" },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#08110f" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#000" },
   emptyText: { color: "#9aaca6" },
 });

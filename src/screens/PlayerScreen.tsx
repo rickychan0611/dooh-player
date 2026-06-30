@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { AdPlayer } from "../components/AdPlayer";
 import { BulletinBoard } from "../components/BulletinBoard";
 import {
@@ -13,11 +13,9 @@ import type { CachedManifest } from "../types";
 export function PlayerScreen({
   manifest,
   onItemChange,
-  onOpenDebug,
 }: {
   manifest: CachedManifest;
   onItemChange: (id: string | null) => void;
-  onOpenDebug: () => void;
 }) {
   const [block, setBlock] = useState<RotationBlock>(() => initialBlock(manifest));
   const stableItemChange = useCallback(onItemChange, [onItemChange]);
@@ -47,30 +45,24 @@ export function PlayerScreen({
   }
 
   return (
-    <Pressable
-      accessibilityLabel="DOOH player"
-      focusable
-      hasTVPreferredFocus
-      onPress={onOpenDebug}
-      style={styles.screen}
-    >
+    <View pointerEvents="none" style={styles.screen}>
       {block === "ads" ? (
         <AdPlayer ads={manifest.ads} onItemChange={stableItemChange} />
       ) : (
         <BulletinBoard manifest={manifest} onItemChange={stableItemChange} />
       )}
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#000" },
+  screen: { flex: 1, backgroundColor: "#000", overflow: "hidden" },
   suspended: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 48,
-    backgroundColor: "#08110f",
+    backgroundColor: "#000",
   },
   suspendedTitle: {
     color: "#f4f7f3",
